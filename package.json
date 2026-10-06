@@ -1,0 +1,11 @@
+{
+  "name": "superiptv",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/admin", "backend/api"],
+  "scripts": {
+    "build": "npm run build -w @superiptv/api && npm run build -w @superiptv/admin",
+    "typecheck": "npm run typecheck -w @superiptv/api && npm run typecheck -w @superiptv/admin"
+  },
+  "engines": { "node": ">=22" }
+}
