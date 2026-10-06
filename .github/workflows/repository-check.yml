@@ -1,0 +1,17 @@
+name: Repository Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate repository foundation
+        run: |
+          test -f README.md
+          test -f docs/ARCHITECTURE.md
+          test -f .gitignore
