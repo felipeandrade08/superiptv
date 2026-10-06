@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.superiptv.app.ui.PlaylistViewModel
-@Composable fun LiveScreen(vm:PlaylistViewModel=viewModel()){
+@Composable fun LiveScreen(onPlay:(String)->Unit,vm:PlaylistViewModel=viewModel()){
  val state by vm.state.collectAsStateWithLifecycle();var dialog by remember{mutableStateOf(false)}
  val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri:Uri?->if(uri!=null)vm.importFile("Playlist importada",uri)}
  Column(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
@@ -23,7 +23,7 @@ import com.superiptv.app.ui.PlaylistViewModel
   if(state.loading)LinearProgressIndicator(Modifier.fillMaxWidth())
   state.message?.let{message->AssistChip(onClick=vm::clearMessage,label={Text(message)})}
   if(state.channels.isEmpty())Text("Nenhum canal importado. Adicione uma playlist M3U por URL ou arquivo.",color=MaterialTheme.colorScheme.onSurfaceVariant)
-  LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(state.channels,key={channel->channel.id}){channel->Card{Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){Column(Modifier.weight(1f)){Text(channel.name,style=MaterialTheme.typography.titleMedium);Text(channel.groupName,style=MaterialTheme.typography.bodySmall)};IconButton(onClick={vm.favorite(channel)}){Icon(if(channel.favorite)Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,"Favorito")}}}}}
+  LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(state.channels,key={channel->channel.id}){channel->Card(onClick={onPlay(channel.id)}){Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){Column(Modifier.weight(1f)){Text(channel.name,style=MaterialTheme.typography.titleMedium);Text(channel.groupName,style=MaterialTheme.typography.bodySmall)};IconButton(onClick={vm.favorite(channel)}){Icon(if(channel.favorite)Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,"Favorito")}}}}}
  }
  if(dialog)AddPlaylistDialog(onDismiss={dialog=false},onUrl={name,url->vm.importUrl(name,url);dialog=false},onFile={picker.launch(arrayOf("audio/x-mpegurl","application/vnd.apple.mpegurl","text/plain","*/*"));dialog=false})
 }
