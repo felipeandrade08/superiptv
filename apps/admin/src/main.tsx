@@ -1,18 +1,5 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-
-function App() {
-  return (
-    <main className="shell">
-      <section className="card">
-        <span className="eyebrow">SUPERIPTV</span>
-        <h1>Painel administrativo</h1>
-        <p>A fundação do SuperIPTV 2.0 está pronta para receber usuários, dispositivos, planos, sessões e auditoria.</p>
-        <div className="status">Pacote 1 · Fundação</div>
-      </section>
-    </main>
-  );
-}
-
-createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);
+function App(){return <main className="admin"><aside><b>SUPERIPTV</b><nav><button>Visão geral</button><button>Catálogo</button><button>Clientes</button><button>Dispositivos</button><button>Planos e acesso</button><button>Auditoria</button></nav></aside><section className="content"><span className="eyebrow">MASTER ADMIN</span><h1>Central de operação</h1><p>O catálogo é administrado somente aqui. Os aplicativos dos clientes recebem apenas o conteúdo e as permissões liberadas pela sua conta.</p><div className="grid"><article><strong>Fonte privada</strong><span>Configuração exclusiva do Master</span></article><article><strong>Clientes</strong><span>Ativar, bloquear e controlar vencimentos</span></article><article><strong>Dispositivos</strong><span>Limites, sessões e revogação</span></article><article><strong>Catálogo</strong><span>Sincronização central para Mobile, TV e Desktop</span></article></div></section></main>}
+createRoot(document.getElementById("root")!).render(<React.StrictMode><App/></React.StrictMode>);
