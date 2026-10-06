@@ -5,3 +5,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "SuperIPTV"
 include(":app")
+include(":tv")
