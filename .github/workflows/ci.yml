@@ -33,4 +33,4 @@ jobs:
         with:
           gradle-version: "8.9"
       - name: Build Android debug APK
-        run: gradle :app:assembleDebug
+        run: gradle :app:assembleDebug :tv:assembleDebug
