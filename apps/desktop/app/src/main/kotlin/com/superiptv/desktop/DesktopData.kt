@@ -28,7 +28,7 @@ class DesktopSession(private val root:Path=Path.of(System.getProperty("user.home
 class DesktopApi(private val base:String){
  private val http=HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build()
  fun login(email:String,password:String,key:String):JSONObject=call("/v1/auth/login","POST",JSONObject().put("email",email).put("password",password).put("deviceKey",key).put("deviceName",System.getProperty("os.name")+" PC").put("platform","desktop"),null)
- fun catalog(token:String):List<DesktopChannel>{val a=call("/v1/catalog","GET",null,token).getJSONArray("items");return (0 until a.length()).map{i->val x=a.getJSONObject(i);DesktopChannel(x.getString("id"),x.getString("name"),x.getString("group"),x.optString("logo").takeIf{it.isNotBlank()&&it!="null"},base.trimEnd('/')+x.getString("playbackPath"))}}
+ fun catalog(token:String):List<DesktopChannel>{val a=call("/v1/catalog","GET",null,token).getJSONArray("items");return (0 until a.length()).map{i->val x=a.getJSONObject(i);DesktopChannel(x.getString("id"),x.getString("name"),x.getString("group"),x.optString("logo").takeIf{it.isNotBlank()&&it!="null"},"")}}
  fun playbackTicket(id:String,token:String):String=base.trimEnd('/')+call("/v1/play/$id/ticket","POST",JSONObject(),token).getString("url")
  fun refresh(token:String):JSONObject=call("/v1/auth/refresh","POST",JSONObject().put("refreshToken",token),null)
  fun logout(refresh:String){call("/v1/auth/logout","POST",JSONObject().put("refreshToken",refresh),null)}
