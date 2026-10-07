@@ -63,12 +63,12 @@ fun TvApp(vm: TvViewModel = viewModel()) {
 private fun TvHome(live:List<TvChannel>,movies:List<TvChannel>,series:List<TvChannel>,recent:List<com.superiptv.tv.data.TvHistory>,onPlay:(String)->Unit,onSection:(String,String)->Unit) {
     Column(Modifier.fillMaxSize().padding(56.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
         Text("SuperIPTV",style=MaterialTheme.typography.displayMedium)
-        if(recent.isNotEmpty()){Text("Continue assistindo",style=MaterialTheme.typography.headlineMedium);LazyRow(horizontalArrangement=Arrangement.spacedBy(18.dp)){items(recent.take(8),key={it.itemId}){item->FocusCard(item.name,progressLabel(item.positionMs,item.durationMs)){onPlay(item.itemId)}}}}
+        if(recent.isNotEmpty()){Text("Continue assistindo",style=MaterialTheme.typography.headlineMedium);LazyRow(horizontalArrangement=Arrangement.spacedBy(18.dp)){items(recent.take(8),key={it.itemId}){item->FocusCard(title=item.name,subtitle=progressLabel(item.positionMs,item.durationMs),onClick={onPlay(item.itemId)})}}}
         listOf("live" to ("TV ao vivo" to live),"movie" to ("Filmes" to movies),"series" to ("Séries" to series)).forEach{entry->
             val type=entry.first;val title=entry.second.first;val items=entry.second.second
             Text(title,style=MaterialTheme.typography.headlineMedium)
             if(items.isEmpty())Text("Nenhum conteúdo disponível.",color=MaterialTheme.colorScheme.onSurfaceVariant)
-            LazyRow(horizontalArrangement=Arrangement.spacedBy(18.dp)){items(items.map{it.groupName}.distinct()){group->FocusCard(group,items.count{it.groupName==group}.toString()+" itens"){onSection(type,group)}}}
+            LazyRow(horizontalArrangement=Arrangement.spacedBy(18.dp)){items(items.map{it.groupName}.distinct()){group->FocusCard(title=group,subtitle=items.count{it.groupName==group}.toString()+" itens",onClick={onSection(type,group)})}}
         }
     }
 }
