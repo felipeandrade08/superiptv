@@ -27,12 +27,19 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     val ui = state.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            sessions.accessToken.collect { token ->
-                state.value = state.value.copy(
-                    checking = false,
-                    logged = !token.isNullOrBlank()
-                )
+        viewModelScope.launch(Dispatchers.IO) {
+            val refresh = sessions.refreshToken.firstOrNull()
+            if (refresh.isNullOrBlank()) {
+                state.value = AuthState(checking = false, logged = false)
+            } else {
+                try {
+                    val data = api.refresh(refresh)
+                    sessions.save(data.getString("accessToken"), data.getString("refreshToken"), sessions.userName.firstOrNull().orEmpty())
+                    state.value = AuthState(checking = false, logged = true, name = sessions.userName.firstOrNull().orEmpty())
+                } catch (_: Exception) {
+                    sessions.clear()
+                    state.value = AuthState(checking = false, logged = false)
+                }
             }
         }
     }
