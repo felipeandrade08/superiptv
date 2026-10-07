@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/server.js",
-    "db:migrate": "tsx src/migrate.ts"
+    "db:migrate": "tsx src/migrate.ts",
+    "db:encrypt-catalog": "tsx src/migrate-catalog-secrets.ts"
   },
   "dependencies": {
     "fastify": "^5.6.0",
