@@ -10,6 +10,7 @@ android {
   compileSdk = 35
   defaultConfig { applicationId = "com.superiptv.app"; minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "0.4.0" }
   buildFeatures { compose = true; buildConfig = true }
+  defaultConfig { buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3000\"") }
   compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
   kotlinOptions { jvmTarget = "17" }
 }
