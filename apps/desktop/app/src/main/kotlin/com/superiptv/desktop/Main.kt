@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 
-private const val API="http://localhost:3000"
+private val API=System.getenv("SUPERIPTV_API_URL")?.trimEnd('/')?:"http://localhost:3000"
 fun main()=application{Window(onCloseRequest=::exitApplication,title="SuperIPTV"){DesktopApp()}}
 @Composable fun DesktopApp(){
  val session=remember{DesktopSession()};val api=remember{DesktopApi(API)};val scope=rememberCoroutineScope()
