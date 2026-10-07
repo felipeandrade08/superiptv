@@ -53,3 +53,5 @@ jobs:
           gradle-version: "8.9"
       - name: Build Desktop
         run: gradle :app:build
+      - name: Package Windows installers
+        run: gradle :app:packageMsi :app:packageExe
