@@ -41,7 +41,7 @@ export function buildApp(){
   if(!d.rows[0])d=await pool.query("insert into devices(user_id,device_key,name,platform) values($1,$2,$3,$4) returning *",[user.id,deviceKey,deviceName??"Dispositivo",platform??"unknown"]);
   else if(!d.rows[0].active)return reply.code(403).send({error:"device_blocked"});
   const device=d.rows[0];await pool.query("update devices set last_seen_at=now() where id=$1",[device.id]);await pool.query("update refresh_sessions set revoked_at=now() where device_id=$1 and revoked_at is null",[device.id]);
-  const access=app.jwt.sign({sub:user.id,role:user.role,deviceId:device.id},{expiresIn:"15m"});const refresh=randomBytes(48).toString("base64url");
+  const access=app.jwt.sign({sub:user.id,role:user.role,deviceId:device.id,sessionVersion:user.session_version},{expiresIn:"15m"});const refresh=randomBytes(48).toString("base64url");
   await pool.query("insert into refresh_sessions(user_id,device_id,token_hash,expires_at) values($1,$2,$3,now()+interval '30 days')",[user.id,device.id,hash(refresh)]);
   return {accessToken:access,refreshToken:refresh,user:{id:user.id,name:user.name,role:user.role},device:{id:device.id,name:device.name}};
  });
