@@ -38,6 +38,7 @@ fun TvApp(vm: TvViewModel = viewModel()) {
         val channels by vm.live.collectAsState()
         val movies by vm.movies.collectAsState()
         val series by vm.series.collectAsState()
+        val continueWatching by vm.continueWatching.collectAsState()
         val auth by vm.auth.collectAsState()
         if (auth.checking) { Box(Modifier.fillMaxSize(),contentAlignment=androidx.compose.ui.Alignment.Center){CircularProgressIndicator()}; return@MaterialTheme }
         if (!auth.logged) { TvLogin(auth,vm::login); return@MaterialTheme }
@@ -52,15 +53,16 @@ fun TvApp(vm: TvViewModel = viewModel()) {
                 val source=when(section){"movie"->movies;"series"->series;else->channels}
                 TvChannelGrid(title=group!!,channels=source.filter{it.groupName==group},onPlay={playing=it})
             }
-            else -> TvHome(channels,movies,series,onSection={type,name->section=type;group=name})
+            else -> TvHome(channels,movies,series,continueWatching,onPlay={id->playing=(channels+movies+series).firstOrNull{it.id==id}},onSection={type,name->section=type;group=name})
         }
     }
 }
 
 @Composable
-private fun TvHome(live:List<TvChannel>,movies:List<TvChannel>,series:List<TvChannel>,onSection:(String,String)->Unit) {
+private fun TvHome(live:List<TvChannel>,movies:List<TvChannel>,series:List<TvChannel>,recent:List<com.superiptv.tv.data.TvHistory>,onPlay:(String)->Unit,onSection:(String,String)->Unit) {
     Column(Modifier.fillMaxSize().padding(56.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
         Text("SuperIPTV",style=MaterialTheme.typography.displayMedium)
+        if(recent.isNotEmpty()){Text("Continue assistindo",style=MaterialTheme.typography.headlineMedium);LazyRow(horizontalArrangement=Arrangement.spacedBy(18.dp)){items(recent.take(8),key={it.itemId}){item->FocusCard(item.name,progressLabel(item.positionMs,item.durationMs)){onPlay(item.itemId)}}}}
         listOf("live" to ("TV ao vivo" to live),"movie" to ("Filmes" to movies),"series" to ("Séries" to series)).forEach{entry->
             val type=entry.first;val title=entry.second.first;val items=entry.second.second
             Text(title,style=MaterialTheme.typography.headlineMedium)
@@ -69,6 +71,7 @@ private fun TvHome(live:List<TvChannel>,movies:List<TvChannel>,series:List<TvCha
         }
     }
 }
+private fun progressLabel(position:Long,duration:Long)=if(duration>0)(((position*100)/duration).coerceIn(0,100)).toString()+"% assistido" else "Em andamento"
 
 @Composable
 private fun TvChannelGrid(
