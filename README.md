@@ -2,7 +2,7 @@
 
 SuperIPTV é um player IPTV multiplataforma em evolução, com foco inicial em Android Mobile e Android TV.
 
-> O projeto não fornece canais, filmes, séries ou listas IPTV. O usuário adiciona suas próprias fontes compatíveis.
+> O SuperIPTV não inclui conteúdo de terceiros. O catálogo é provisionado pelo administrador a partir de fontes que ele esteja autorizado a disponibilizar aos clientes; usuários finais não cadastram playlists.
 
 ## Arquitetura
 
@@ -33,7 +33,7 @@ docs/
 2. Aplicativo Android compilando do zero.
 3. Base compartilhada Mobile/TV.
 4. Player Media3.
-5. Importação de playlist M3U.
+5. Catálogo central administrado pelo Master e distribuído aos clientes autorizados.
 6. Persistência local.
 7. API TypeScript.
 8. Painel administrativo inicial.
