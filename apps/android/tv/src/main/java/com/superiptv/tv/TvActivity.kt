@@ -45,13 +45,14 @@ fun TvApp(vm: TvViewModel = viewModel()) {
         var group by remember { mutableStateOf<String?>(null) }
         var section by remember { mutableStateOf("live") }
         var playing by remember { mutableStateOf<TvChannel?>(null) }
+        var query by remember { mutableStateOf("") }
 
         when {
             playing != null -> TvPlayerScreen(channel = playing!!, onBack = { playing = null }, vm = vm)
             group != null -> {
                 BackHandler { group = null }
                 val source=when(section){"movie"->movies;"series"->series;else->channels}
-                TvChannelGrid(title=group!!,channels=source.filter{it.groupName==group},onPlay={playing=it})
+                TvChannelGrid(title=group!!,channels=source.filter{it.groupName==group},query=query,onQuery={query=it},onPlay={playing=it})
             }
             else -> TvHome(channels,movies,series,continueWatching,onPlay={id->playing=(channels+movies+series).firstOrNull{it.id==id}},onSection={type,name->section=type;group=name})
         }
@@ -75,21 +76,26 @@ private fun progressLabel(position:Long,duration:Long)=if(duration>0)(((position
 
 @Composable
 private fun TvChannelGrid(
-    title: String,
-    channels: List<TvChannel>,
-    onPlay: (TvChannel) -> Unit
+    title:String,
+    channels:List<TvChannel>,
+    query:String,
+    onQuery:(String)->Unit,
+    onPlay:(TvChannel)->Unit
 ) {
+    val filtered=if(query.isBlank()) channels else channels.filter{it.name.contains(query,true)||it.groupName.contains(query,true)||it.seriesName?.contains(query,true)==true}
+    val display=if(filtered.firstOrNull()?.contentType=="series") filtered.sortedWith(compareBy<TvChannel>{it.seriesName?:it.name}.thenBy{it.seasonNumber?:Int.MAX_VALUE}.thenBy{it.episodeNumber?:Int.MAX_VALUE}.thenBy{it.name}) else filtered
     Column(
         Modifier.fillMaxSize().padding(56.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text(title, style = MaterialTheme.typography.headlineLarge)
+        OutlinedTextField(query,onQuery,modifier=Modifier.fillMaxWidth(),label={Text("Buscar nesta categoria")},singleLine=true)
         LazyVerticalGrid(
             columns = GridCells.Adaptive(240.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(channels, key = { it.id }) { channel ->
+            items(display, key = { it.id }) { channel ->
                 FocusCard(
                     title = channel.name,
                     subtitle = channel.groupName,
