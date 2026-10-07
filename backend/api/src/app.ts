@@ -55,10 +55,12 @@ export function buildApp(){
  app.get("/v1/play-ticket/:ticket",async(req:any,reply)=>{let ticket:any;try{ticket=app.jwt.verify(req.params.ticket)}catch{return reply.code(401).send({error:"ticket_invalid"})}if(ticket.purpose!=="playback"||!ticket.mediaId)return reply.code(401).send({error:"ticket_invalid"});const access=await pool.query("select u.status,u.expires_at,d.active device_active from app_users u left join devices d on d.id=$2 where u.id=$1",[ticket.sub,ticket.deviceId??null]);const a=access.rows[0];if(!a||a.status!=="active"||a.device_active===false||(a.expires_at&&new Date(a.expires_at)<=new Date()))return reply.code(403).send({error:"access_inactive"});const r=await pool.query("select i.stream_url,i.stream_url_encrypted from catalog_items i left join customer_catalog_groups g on g.user_id=$2 and g.group_name=i.group_name where i.id=$1 and i.active=true and coalesce(g.allowed,true)=true",[ticket.mediaId,ticket.sub]);if(!r.rows[0])return reply.code(404).send({error:"not_found"});const streamUrl=r.rows[0].stream_url_encrypted?decryptSecret(r.rows[0].stream_url_encrypted):r.rows[0].stream_url;if(!streamUrl)return reply.code(404).send({error:"not_found"});return reply.redirect(streamUrl)});
  app.post("/v1/admin/catalog/sync",{preHandler:master},async(req:any,reply)=>{
   const {name,sourceUrl}=req.body??{};if(!name||!sourceUrl||!/^https?:\/\//i.test(sourceUrl))return reply.code(400).send({error:"invalid_source"});
+  const started=Date.now();const run=await pool.query("insert into catalog_sync_runs(source_name,status) values($1,'running') returning id",[String(name)]);const runId=run.rows[0].id;
+  const finish=async(status:"success"|"failed",errorCode:string|null,items:number,bytes:number)=>{await pool.query("update catalog_sync_runs set status=$1,error_code=$2,items=$3,bytes=$4,duration_ms=$5,finished_at=now() where id=$6",[status,errorCode,items,bytes,Date.now()-started,runId])};
   const configuredBytes=Number(process.env.CATALOG_SYNC_MAX_BYTES??50*1024*1024);const configuredItems=Number(process.env.CATALOG_SYNC_MAX_ITEMS??100000);const maxBytes=Number.isFinite(configuredBytes)?Math.max(1024,configuredBytes):50*1024*1024;const maxItems=Number.isFinite(configuredItems)?Math.max(1,Math.floor(configuredItems)):100000;
-  let response:Response;try{response=await fetch(sourceUrl,{redirect:"follow",signal:AbortSignal.timeout(30000)})}catch(error){req.log.warn({error},"catalog_source_fetch_failed");return reply.code(502).send({error:"source_unavailable"})}
-  if(!response.ok||!response.body)return reply.code(502).send({error:"source_unavailable"});
-  const declared=Number(response.headers.get("content-length")??0);if(declared>maxBytes)return reply.code(413).send({error:"catalog_too_large"});
+  let response:Response;try{response=await fetch(sourceUrl,{redirect:"follow",signal:AbortSignal.timeout(30000)})}catch{await finish("failed","source_unavailable",0,0);req.log.warn({runId},"catalog_source_fetch_failed");return reply.code(502).send({error:"source_unavailable"})}
+  if(!response.ok||!response.body){await finish("failed","source_unavailable",0,0);return reply.code(502).send({error:"source_unavailable"})}
+  const declared=Number(response.headers.get("content-length")??0);if(declared>maxBytes){await finish("failed","catalog_too_large",0,declared);return reply.code(413).send({error:"catalog_too_large"})}
   const client=await pool.connect();let count=0;let bytes=0;let info="";
   const limited=Readable.fromWeb(response.body as any).on("data",(chunk:Buffer|string)=>{bytes+=Buffer.byteLength(chunk);if(bytes>maxBytes)limited.destroy(new Error("catalog_too_large"))});
   try{
@@ -72,10 +74,10 @@ export function buildApp(){
    }
    if(!count)throw new Error("empty_catalog");
    await client.query("delete from catalog_sources");await client.query("insert into catalog_sources(name,source_url,source_url_encrypted,active,updated_at) values($1,null,$2,true,now())",[name,encryptSecret(sourceUrl)]);
-   await client.query("commit");await audit(req,"catalog_synced","catalog",undefined,{name,items:count,bytes});return {ok:true,items:count,bytes};
+   await client.query("commit");await finish("success",null,count,bytes);await audit(req,"catalog_synced","catalog",undefined,{name,items:count,bytes,runId});return {ok:true,items:count,bytes,runId};
   }catch(error:any){
-   await client.query("rollback");req.log.warn({message:error?.message,items:count,bytes},"catalog_sync_failed");
-   if(error?.message==="catalog_too_large"||error?.message==="catalog_item_limit")return reply.code(413).send({error:error.message});
+   await client.query("rollback");const code=error?.message==="catalog_too_large"||error?.message==="catalog_item_limit"?error.message:"catalog_sync_failed";await finish("failed",code,count,bytes);req.log.warn({runId,errorCode:code,items:count,bytes},"catalog_sync_failed");
+   if(code==="catalog_too_large"||code==="catalog_item_limit")return reply.code(413).send({error:code});
    return reply.code(400).send({error:"catalog_sync_failed"});
   }finally{client.release()}
  });
