@@ -9,6 +9,7 @@ import com.superiptv.app.data.SuperIptvApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
 data class AuthState(
@@ -32,6 +33,28 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                     checking = false,
                     logged = !token.isNullOrBlank()
                 )
+            }
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val refresh = sessions.refreshToken.firstOrNull()
+            try { if (!refresh.isNullOrBlank()) api.logout(refresh) } catch (_: Exception) {}
+            sessions.clear()
+            state.value = AuthState(checking = false, logged = false)
+        }
+    }
+
+    fun refreshSession() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val refresh = sessions.refreshToken.firstOrNull()
+            if (refresh.isNullOrBlank()) { sessions.clear(); return@launch }
+            try {
+                val data = api.refresh(refresh)
+                sessions.updateAccess(data.getString("accessToken"))
+            } catch (_: Exception) {
+                sessions.clear()
             }
         }
     }
