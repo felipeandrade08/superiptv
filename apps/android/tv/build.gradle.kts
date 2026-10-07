@@ -1,7 +1,7 @@
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android"); id("org.jetbrains.kotlin.plugin.compose"); id("com.google.devtools.ksp") version "2.0.21-1.0.28" }
 android { namespace="com.superiptv.tv"; compileSdk=35
- defaultConfig { applicationId="com.superiptv.tv"; minSdk=26; targetSdk=35; versionCode=1; versionName="0.5.0" }
- buildFeatures { compose=true }
+ defaultConfig { applicationId="com.superiptv.tv"; minSdk=26; targetSdk=35; versionCode=1; versionName="0.5.0"; buildConfigField("String","API_BASE_URL","\"http://10.0.2.2:3000\"") }
+ buildFeatures { compose=true; buildConfig=true }
  compileOptions { sourceCompatibility=JavaVersion.VERSION_17; targetCompatibility=JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget="17" }
 }
@@ -18,5 +18,7 @@ dependencies {
  ksp("androidx.room:room-compiler:2.6.1")
  implementation("androidx.media3:media3-exoplayer:1.5.1")
  implementation("androidx.media3:media3-ui:1.5.1")
+ implementation("com.squareup.okhttp3:okhttp:4.12.0")
+ implementation("androidx.datastore:datastore-preferences:1.1.1")
  debugImplementation("androidx.compose.ui:ui-tooling")
 }
