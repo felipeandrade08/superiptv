@@ -13,8 +13,12 @@ class PlaylistRepository(private val context:Context){
  private val db=AppDatabase.get(context);private val parser=M3uParser()
  fun channels():Flow<List<ChannelEntity>> = db.channels().observeAll()
  fun favorites():Flow<List<ChannelEntity>> = db.channels().observeFavorites()
- suspend fun replaceManagedCatalog(items:List<ChannelEntity>){db.channels().deleteForPlaylist("managed");db.channels().saveAll(items)}
+ fun movies():Flow<List<VodEntity>> = db.vod().observeMovies()
+ fun series():Flow<List<VodEntity>> = db.vod().observeSeries()
+ fun vodFavorites():Flow<List<VodEntity>> = db.vod().observeFavorites()
+ suspend fun replaceManagedCatalog(items:List<ChannelEntity>,vod:List<VodEntity>){val channelFav=db.channels().favoriteIds().toSet();val vodFav=db.vod().favoriteIds().toSet();db.channels().deleteForPlaylist("managed");db.channels().saveAll(items.map{it.copy(favorite=it.id in channelFav)});db.vod().clear();db.vod().saveAll(vod.map{it.copy(favorite=it.id in vodFav)})}
  suspend fun toggleFavorite(channel:ChannelEntity)=db.channels().setFavorite(channel.id,!channel.favorite)
+ suspend fun toggleFavorite(item:VodEntity)=db.vod().setFavorite(item.id,!item.favorite)
  suspend fun importUrl(name:String,url:String)=withContext(Dispatchers.IO){
   require(url.startsWith("http://")||url.startsWith("https://")){"Use uma URL HTTP ou HTTPS válida."}
   val conn=(URL(url).openConnection() as HttpURLConnection).apply{connectTimeout=15000;readTimeout=30000;instanceFollowRedirects=true;setRequestProperty("User-Agent","SuperIPTV/0.3")}
