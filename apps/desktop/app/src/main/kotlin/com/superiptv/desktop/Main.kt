@@ -12,6 +12,7 @@ import androidx.compose.ui.window.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 
 private const val API="http://localhost:3000"
 fun main()=application{Window(onCloseRequest=::exitApplication,title="SuperIPTV"){DesktopApp()}}
@@ -20,7 +21,7 @@ fun main()=application{Window(onCloseRequest=::exitApplication,title="SuperIPTV"
  var logged by remember{mutableStateOf(!session.access.isNullOrBlank())};var selected by remember{mutableStateOf<DesktopChannel?>(null)};var loading by remember{mutableStateOf(false)};var error by remember{mutableStateOf<String?>(null)};var channels by remember{mutableStateOf(session.cached())}
  MaterialTheme(colorScheme=darkColorScheme()){
   if(!logged){Login(loading,error){email,password->scope.launch{loading=true;error=null;try{val d=withContext(Dispatchers.IO){api.login(email,password,session.deviceKey)};session.save(d.getString("accessToken"),d.getString("refreshToken"));logged=true;channels=withContext(Dispatchers.IO){api.catalog(d.getString("accessToken"))};session.cache(channels)}catch(e:Exception){error=e.message}finally{loading=false}}};return@MaterialTheme}
-  LaunchedEffect(logged){if(logged&&session.access!=null)runCatching{withContext(Dispatchers.IO){api.catalog(session.access!!)}}.onSuccess{channels=it;session.cache(it)}}
+  LaunchedEffect(logged){if(logged){while(logged){val refresh=session.refresh;if(refresh==null){session.clear();logged=false;break};val renewed=runCatching{withContext(Dispatchers.IO){api.refresh(refresh)}}.getOrNull();if(renewed==null){session.clear();logged=false;break};session.save(renewed.getString("accessToken"),renewed.getString("refreshToken"));runCatching{withContext(Dispatchers.IO){api.catalog(session.access!!)}}.onSuccess{channels=it;session.cache(it)};delay(10*60*1000L)}}}
   var section by remember{mutableStateOf("Início")};Row(Modifier.fillMaxSize()){NavigationRail{listOf("Início","Ao vivo","Filmes","Séries","Minha lista","Configurações").forEach{s->NavigationRailItem(selected=section==s,onClick={section=s},icon={Text(s.take(1))},label={Text(s)})}}
    Column(Modifier.fillMaxSize().padding(32.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Column{Text("SuperIPTV Desktop",style=MaterialTheme.typography.displaySmall);Text(section,style=MaterialTheme.typography.headlineMedium)};TextButton(onClick={scope.launch{val refresh=session.refresh;withContext(Dispatchers.IO){runCatching{if(refresh!=null)api.logout(refresh)}};session.clear();logged=false}}){Text("Sair")}}
     when{selected!=null->DesktopPlayer(selected!!,session){selected=null};section=="Ao vivo"->ChannelList(channels){selected=it};else->Text(if(channels.isEmpty())"Catálogo ainda não sincronizado." else "${channels.size} itens liberados pelo administrador.")}}}
