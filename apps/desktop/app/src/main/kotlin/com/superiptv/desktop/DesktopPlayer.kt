@@ -18,6 +18,8 @@ class DesktopPlayerPanel:JPanel(BorderLayout()){
  init{component?.let{add(it,BorderLayout.CENTER)}}
  fun isAvailable()=available
  fun play(url:String){component?.mediaPlayer()?.media()?.play(url,":http-referrer=SuperIPTV",":http-user-agent=SuperIPTV Desktop")}
+ fun seek(positionMs:Long){if(positionMs>0)component?.mediaPlayer()?.controls()?.setTime(positionMs)}
+ fun position():Long=component?.mediaPlayer()?.status()?.time()?:0L
  fun stop(){component?.mediaPlayer()?.controls()?.stop()}
  fun release(){component?.release()}
 }
