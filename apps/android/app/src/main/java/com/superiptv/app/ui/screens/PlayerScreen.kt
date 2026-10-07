@@ -21,8 +21,6 @@ import androidx.media3.common.C
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.superiptv.app.data.local.ChannelEntity
 import com.superiptv.app.player.PlayerViewModel
@@ -31,12 +29,12 @@ import com.superiptv.app.player.PlayerViewModel
 @Composable fun PlayerScreen(channelId:String,onBack:()->Unit,vm:PlayerViewModel=viewModel()){
  val channels by vm.channels.collectAsState();val initial=channels.indexOfFirst{it.id==channelId}
  if(initial<0){LaunchedEffect(Unit){onBack()};return}
- val context=LocalContext.current;val activity=context as? Activity;val accessToken by vm.accessToken.collectAsState()
- val player=remember(accessToken){val http=DefaultHttpDataSource.Factory().setDefaultRequestProperties(mapOf("Authorization" to "Bearer "+accessToken.orEmpty())).setAllowCrossProtocolRedirects(true);ExoPlayer.Builder(context).setMediaSourceFactory(DefaultMediaSourceFactory(http)).build()};var currentIndex by remember(channelId){mutableIntStateOf(initial)};var retries by remember{mutableIntStateOf(0)};var tracksOpen by remember{mutableStateOf(false)}
+ val context=LocalContext.current;val activity=context as? Activity
+ val player=remember{ExoPlayer.Builder(context).build()};var currentIndex by remember(channelId){mutableIntStateOf(initial)};var retries by remember{mutableIntStateOf(0)};var tracksOpen by remember{mutableStateOf(false)}
  val current=channels.getOrNull(currentIndex)?:return
  fun saveCurrent(){vm.save(current,player.currentPosition,player.duration.takeIf{it>0}?:0)}
- fun playAt(index:Int){val target=channels.getOrNull(index)?:return;saveCurrent();currentIndex=index;retries=0;player.setMediaItem(MediaItem.fromUri(target.streamUrl));player.prepare();player.playWhenReady=true}
- LaunchedEffect(channelId){player.setMediaItem(MediaItem.fromUri(current.streamUrl));player.prepare();player.playWhenReady=true}
+ fun playAt(index:Int){val target=channels.getOrNull(index)?:return;saveCurrent();currentIndex=index;retries=0}
+ LaunchedEffect(current.id){val url=vm.playbackUrl(current.id);player.setMediaItem(MediaItem.fromUri(url));player.prepare();player.playWhenReady=true}
  DisposableEffect(player){val listener=object:Player.Listener{override fun onPlayerError(error:androidx.media3.common.PlaybackException){if(retries<3){retries++;player.prepare();player.play()}}};player.addListener(listener);onDispose{saveCurrent();player.removeListener(listener);player.release()}}
  Column(Modifier.fillMaxSize()){
   AndroidView(factory={PlayerView(it).apply{this.player=player;useController=true;layoutParams=ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT)}},modifier=Modifier.weight(1f).fillMaxWidth())
