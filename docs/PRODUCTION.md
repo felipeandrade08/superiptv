@@ -53,3 +53,22 @@ As colunas legadas permanecem temporariamente para compatibilidade de migração
 Android Mobile e Android TV recebem a API pelo Gradle property `SUPERIPTV_API_URL`. Em produção, forneça uma URL HTTPS durante o build. O Desktop lê `SUPERIPTV_API_URL` do ambiente. O painel web usa `VITE_API_URL`.
 
 Os fallbacks HTTP/localhost existem somente para desenvolvimento local e não devem ser usados nos artefatos distribuídos.
+
+## Status operacional do catálogo
+
+Cada tentativa de sincronização gera um registro em `catalog_sync_runs` com estado, código de erro sanitizado, itens, bytes, duração e horários. A URL privada e mensagens brutas do upstream não são persistidas nesse histórico nem retornadas ao Master.
+
+O painel exibe somente esse resumo operacional. Para diagnóstico, use o `runId` e os logs estruturados do servidor; não adicione a URL da fonte aos logs.
+
+## Rotação da chave do catálogo
+
+A rotação é uma operação offline e não possui endpoint HTTP.
+
+1. faça backup do PostgreSQL e pare sincronizações do catálogo;
+2. mantenha a chave atual em `CATALOG_OLD_SECRET_KEY`;
+3. configure a nova chave em `CATALOG_SECRET_KEY`;
+4. execute `npm --workspace backend/api run db:rotate-catalog-key`;
+5. valide catálogo e playback com a nova chave antes de remover a chave antiga do ambiente;
+6. remova `CATALOG_OLD_SECRET_KEY` imediatamente após a validação.
+
+Nunca execute a rotação em duas instâncias ao mesmo tempo. Não perca a chave antiga antes da conclusão: AES-GCM foi escolhido para que uma chave incorreta falhe na autenticação em vez de produzir silenciosamente uma URL corrompida.
