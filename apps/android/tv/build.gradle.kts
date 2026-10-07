@@ -1,6 +1,7 @@
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android"); id("org.jetbrains.kotlin.plugin.compose"); id("com.google.devtools.ksp") version "2.0.21-1.0.28" }
 android { namespace="com.superiptv.tv"; compileSdk=35
- defaultConfig { applicationId="com.superiptv.tv"; minSdk=26; targetSdk=35; versionCode=1; versionName="0.5.0"; buildConfigField("String","API_BASE_URL","\"http://10.0.2.2:3000\"") }
+ val apiBaseUrl=providers.gradleProperty("SUPERIPTV_API_URL").orElse("http://10.0.2.2:3000")
+ defaultConfig { applicationId="com.superiptv.tv"; minSdk=26; targetSdk=35; versionCode=1; versionName="0.5.0"; buildConfigField("String","API_BASE_URL","\"${apiBaseUrl.get()}\"") }
  buildFeatures { compose=true; buildConfig=true }
  compileOptions { sourceCompatibility=JavaVersion.VERSION_17; targetCompatibility=JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget="17" }
