@@ -25,7 +25,7 @@ import androidx.media3.ui.PlayerView
 import com.superiptv.app.player.PlayerViewModel
 
 @OptIn(UnstableApi::class)
-@Composable fun PlayerScreen(channelId:String,onBack:()->Unit,vm:PlayerViewModel=viewModel()){
+@Composable fun PlayerScreen(channelId:String,onBack:()->Unit,onSwitchLive:(String)->Unit,vm:PlayerViewModel=viewModel()){
  val channels by vm.channels.collectAsState();val movies by vm.movies.collectAsState();val series by vm.series.collectAsState()
  val item=remember(channelId,channels,movies,series){vm.find(channelId)}
  if(item==null){if(channels.isNotEmpty()||movies.isNotEmpty()||series.isNotEmpty())LaunchedEffect(Unit){onBack()};return}
@@ -33,7 +33,7 @@ import com.superiptv.app.player.PlayerViewModel
  val player=remember{ExoPlayer.Builder(context).build()};var retries by remember{mutableIntStateOf(0)};var tracksOpen by remember{mutableStateOf(false)}
  val liveIndex=channels.indexOfFirst{it.id==item.id}
  fun saveCurrent(){vm.save(item,player.currentPosition,player.duration.takeIf{it>0}?:0)}
- fun playLive(index:Int){val target=channels.getOrNull(index)?:return;saveCurrent();onBack()}
+ fun playLive(index:Int){val target=channels.getOrNull(index)?:return;saveCurrent();onSwitchLive(target.id)}
  LaunchedEffect(item.id){val url=vm.playbackUrl(item.id);val resume=vm.resumePosition(item.id);player.setMediaItem(MediaItem.fromUri(url));player.prepare();if(resume>0)player.seekTo(resume);player.playWhenReady=true}
  DisposableEffect(player){val listener=object:Player.Listener{override fun onPlayerError(error:androidx.media3.common.PlaybackException){if(retries<3){retries++;player.prepare();player.play()}}};player.addListener(listener);onDispose{saveCurrent();player.removeListener(listener);player.release()}}
  Column(Modifier.fillMaxSize()){
