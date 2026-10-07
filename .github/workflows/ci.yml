@@ -16,6 +16,8 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm run build
+      - name: Verify migration runner builds
+        run: npm --workspace backend/api run build
 
   android:
     runs-on: ubuntu-latest
