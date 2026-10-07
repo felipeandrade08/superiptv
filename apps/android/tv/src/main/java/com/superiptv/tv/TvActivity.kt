@@ -52,7 +52,7 @@ fun TvApp(vm: TvViewModel = viewModel()) {
             group != null -> {
                 BackHandler { group = null }
                 val source=when(section){"movie"->movies;"series"->series;else->channels}
-                TvChannelGrid(title=group!!,channels=source.filter{it.groupName==group},query=query,onQuery={query=it},onPlay={playing=it})
+                TvChannelGrid(title=group!!,channels=source.filter{it.groupName==group},query=query,onQuery={query=it},onFavorite=vm::favorite,onPlay={playing=it})
             }
             else -> TvHome(channels,movies,series,continueWatching,onPlay={id->playing=(channels+movies+series).firstOrNull{it.id==id}},onSection={type,name->section=type;group=name})
         }
@@ -80,6 +80,7 @@ private fun TvChannelGrid(
     channels:List<TvChannel>,
     query:String,
     onQuery:(String)->Unit,
+    onFavorite:(TvChannel)->Unit,
     onPlay:(TvChannel)->Unit
 ) {
     val filtered=if(query.isBlank()) channels else channels.filter{it.name.contains(query,true)||it.groupName.contains(query,true)||it.seriesName?.contains(query,true)==true}
@@ -99,7 +100,9 @@ private fun TvChannelGrid(
                 FocusCard(
                     title = channel.name,
                     subtitle = channel.groupName,
-                    onClick = { onPlay(channel) }
+                    onClick = { onPlay(channel) },
+                    favorite = channel.favorite,
+                    onFavorite = { onFavorite(channel) }
                 )
             }
         }
@@ -107,7 +110,7 @@ private fun TvChannelGrid(
 }
 
 @Composable
-private fun FocusCard(title: String, subtitle: String, onClick: () -> Unit) {
+private fun FocusCard(title:String,subtitle:String,onClick:()->Unit,favorite:Boolean=false,onFavorite:(()->Unit)?=null) {
     var focused by remember { mutableStateOf(false) }
     Card(
         onClick = onClick,
@@ -130,6 +133,7 @@ private fun FocusCard(title: String, subtitle: String, onClick: () -> Unit) {
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge)
             Text(subtitle)
+            if(onFavorite!=null) TextButton(onClick=onFavorite){Text(if(favorite)"♥ Favorito" else "♡ Favoritar")}
         }
     }
 }
