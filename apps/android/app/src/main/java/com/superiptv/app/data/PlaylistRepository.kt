@@ -13,6 +13,7 @@ class PlaylistRepository(private val context:Context){
  private val db=AppDatabase.get(context);private val parser=M3uParser()
  fun channels():Flow<List<ChannelEntity>> = db.channels().observeAll()
  fun favorites():Flow<List<ChannelEntity>> = db.channels().observeFavorites()
+ suspend fun replaceManagedCatalog(items:List<ChannelEntity>){db.channels().deleteForPlaylist("managed");db.channels().saveAll(items)}
  suspend fun toggleFavorite(channel:ChannelEntity)=db.channels().setFavorite(channel.id,!channel.favorite)
  suspend fun importUrl(name:String,url:String)=withContext(Dispatchers.IO){
   require(url.startsWith("http://")||url.startsWith("https://")){"Use uma URL HTTP ou HTTPS válida."}
