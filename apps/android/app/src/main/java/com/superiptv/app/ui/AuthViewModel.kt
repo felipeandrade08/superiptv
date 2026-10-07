@@ -52,7 +52,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
             if (refresh.isNullOrBlank()) { sessions.clear(); return@launch }
             try {
                 val data = api.refresh(refresh)
-                sessions.updateAccess(data.getString("accessToken"))
+                sessions.save(data.getString("accessToken"), data.getString("refreshToken"), sessions.userName.firstOrNull().orEmpty())
             } catch (_: Exception) {
                 sessions.clear()
             }
