@@ -13,11 +13,11 @@ object VlcRuntime {
   return NativeDiscovery().discover()
  }
 }
-class DesktopPlayerPanel(private val tokenProvider:()->String?):JPanel(BorderLayout()){
+class DesktopPlayerPanel:JPanel(BorderLayout()){
  private val available=VlcRuntime.configure();private val component=if(available)EmbeddedMediaPlayerComponent() else null
  init{component?.let{add(it,BorderLayout.CENTER)}}
  fun isAvailable()=available
- fun play(url:String){val token=tokenProvider().orEmpty();component?.mediaPlayer()?.media()?.play(url,":http-referrer=SuperIPTV",":http-user-agent=SuperIPTV Desktop",":http-header=Authorization: Bearer $token")}
+ fun play(url:String){component?.mediaPlayer()?.media()?.play(url,":http-referrer=SuperIPTV",":http-user-agent=SuperIPTV Desktop")}
  fun stop(){component?.mediaPlayer()?.controls()?.stop()}
  fun release(){component?.release()}
 }
