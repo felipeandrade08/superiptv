@@ -7,6 +7,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { Readable } from "node:stream";
 import { createInterface } from "node:readline";
 import { pool } from "./db.js";
+import { decryptSecret, encryptSecret } from "./secrets.js";
 
 type JwtUser={sub:string;role:"master"|"customer";deviceId?:string;sessionVersion?:number;deviceVersion?:number};
 type PgError={code?:string;constraint?:string};
@@ -19,6 +20,8 @@ export function buildApp(){
  if(production&&!process.env.DATABASE_URL)throw new Error("DATABASE_URL is required in production");
  if(production&&!process.env.MASTER_BOOTSTRAP_TOKEN)throw new Error("MASTER_BOOTSTRAP_TOKEN is required in production");
  if(production&&!origins.length)throw new Error("CORS_ORIGINS is required in production");
+ if(production&&!process.env.CATALOG_SECRET_KEY)throw new Error("CATALOG_SECRET_KEY is required in production");
+ if(production&&!/^https:\/\//i.test(process.env.PUBLIC_API_URL??""))throw new Error("PUBLIC_API_URL must be HTTPS in production");
  const app=Fastify({logger:true,bodyLimit:2*1024*1024,trustProxy:process.env.TRUST_PROXY==="true"});
  app.register(jwt,{secret:secret??"development-only-change-me"});
  app.register(cors,{origin:origins.length?origins:false,credentials:false});
