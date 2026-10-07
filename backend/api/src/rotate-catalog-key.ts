@@ -1,10 +1,12 @@
 import { pool } from "./db.js";
 import { decryptSecretWithKey, encryptSecret } from "./secrets.js";
 
-const oldKey=process.env.CATALOG_OLD_SECRET_KEY;
-if(!oldKey)throw new Error("CATALOG_OLD_SECRET_KEY is required");
-if(!process.env.CATALOG_SECRET_KEY)throw new Error("CATALOG_SECRET_KEY is required");
-if(oldKey===process.env.CATALOG_SECRET_KEY)throw new Error("old and new catalog keys must differ");
+const oldKeyValue=process.env.CATALOG_OLD_SECRET_KEY;
+const newKeyValue=process.env.CATALOG_SECRET_KEY;
+if(!oldKeyValue)throw new Error("CATALOG_OLD_SECRET_KEY is required");
+if(!newKeyValue)throw new Error("CATALOG_SECRET_KEY is required");
+if(oldKeyValue===newKeyValue)throw new Error("old and new catalog keys must differ");
+const oldKey:string=oldKeyValue;
 
 async function run(){
  const client=await pool.connect();let sources=0;let rotated=0;let lastId="";
