@@ -36,6 +36,9 @@ fun TvApp(vm: TvViewModel = viewModel()) {
         )
     ) {
         val channels by vm.channels.collectAsState()
+        val auth by vm.auth.collectAsState()
+        if (auth.checking) { Box(Modifier.fillMaxSize(),contentAlignment=androidx.compose.ui.Alignment.Center){CircularProgressIndicator()}; return@MaterialTheme }
+        if (!auth.logged) { TvLogin(auth,vm::login); return@MaterialTheme }
         var group by remember { mutableStateOf<String?>(null) }
         var playing by remember { mutableStateOf<TvChannel?>(null) }
 
@@ -135,3 +138,5 @@ private fun FocusCard(title: String, subtitle: String, onClick: () -> Unit) {
         }
     }
 }
+
+@Composable private fun TvLogin(state:TvAuthState,onLogin:(String,String)->Unit){var email by remember{mutableStateOf("")};var password by remember{mutableStateOf("")};Box(Modifier.fillMaxSize(),contentAlignment=androidx.compose.ui.Alignment.Center){Card(Modifier.width(520.dp)){Column(Modifier.padding(32.dp),verticalArrangement=Arrangement.spacedBy(18.dp)){Text("SuperIPTV",style=MaterialTheme.typography.displaySmall);Text("Entre com a conta liberada pelo administrador.");OutlinedTextField(email,{email=it},label={Text("E-mail")},modifier=Modifier.fillMaxWidth());OutlinedTextField(password,{password=it},label={Text("Senha")},modifier=Modifier.fillMaxWidth());Button(onClick={onLogin(email,password)},enabled=!state.loading,modifier=Modifier.fillMaxWidth()){Text(if(state.loading)"Entrando..." else "Entrar")};state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}}}}}
