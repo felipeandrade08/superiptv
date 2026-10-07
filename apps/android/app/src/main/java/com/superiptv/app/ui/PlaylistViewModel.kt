@@ -12,10 +12,12 @@ import kotlinx.coroutines.launch
 data class PlaylistUiState(val loading:Boolean=false,val channels:List<ChannelEntity> = emptyList(),val movies:List<VodEntity> = emptyList(),val series:List<VodEntity> = emptyList(),val query:String="",val message:String?=null)
 class PlaylistViewModel(app:Application):AndroidViewModel(app){
  private val repo=PlaylistRepository(app);private val sessions=SessionRepository(app);private val api=SuperIptvApi(BuildConfig.API_BASE_URL);private val query=MutableStateFlow("");private val message=MutableStateFlow<String?>(null);private val loading=MutableStateFlow(false)
- val state=combine(repo.channels(),repo.movies(),repo.series(),query,loading,message){channels,movies,series,q,l,m->
-  val filteredChannels=if(q.isBlank())channels else channels.filter{it.name.contains(q,true)||it.groupName.contains(q,true)}
-  val filteredMovies=if(q.isBlank())movies else movies.filter{it.name.contains(q,true)||it.groupName.contains(q,true)}
-  val filteredSeries=if(q.isBlank())series else series.filter{it.name.contains(q,true)||it.groupName.contains(q,true)||it.seriesName?.contains(q,true)==true}
+ private data class CatalogSnapshot(val channels:List<ChannelEntity>,val movies:List<VodEntity>,val series:List<VodEntity>)
+ private val catalog=combine(repo.channels(),repo.movies(),repo.series()){channels,movies,series->CatalogSnapshot(channels,movies,series)}
+ val state=combine(catalog,query,loading,message){catalog,q,l,m->
+  val filteredChannels=if(q.isBlank())catalog.channels else catalog.channels.filter{it.name.contains(q,true)||it.groupName.contains(q,true)}
+  val filteredMovies=if(q.isBlank())catalog.movies else catalog.movies.filter{it.name.contains(q,true)||it.groupName.contains(q,true)}
+  val filteredSeries=if(q.isBlank())catalog.series else catalog.series.filter{it.name.contains(q,true)||it.groupName.contains(q,true)||it.seriesName?.contains(q,true)==true}
   PlaylistUiState(l,filteredChannels,filteredMovies,filteredSeries,q,m)
  }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),PlaylistUiState())
  init{refresh()}
