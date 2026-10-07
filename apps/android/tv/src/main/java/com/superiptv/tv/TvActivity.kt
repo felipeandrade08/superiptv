@@ -35,51 +35,37 @@ fun TvApp(vm: TvViewModel = viewModel()) {
             background = Color(0xFF08090D)
         )
     ) {
-        val channels by vm.channels.collectAsState()
+        val channels by vm.live.collectAsState()
+        val movies by vm.movies.collectAsState()
+        val series by vm.series.collectAsState()
         val auth by vm.auth.collectAsState()
         if (auth.checking) { Box(Modifier.fillMaxSize(),contentAlignment=androidx.compose.ui.Alignment.Center){CircularProgressIndicator()}; return@MaterialTheme }
         if (!auth.logged) { TvLogin(auth,vm::login); return@MaterialTheme }
         var group by remember { mutableStateOf<String?>(null) }
+        var section by remember { mutableStateOf("live") }
         var playing by remember { mutableStateOf<TvChannel?>(null) }
 
         when {
             playing != null -> TvPlayerScreen(channel = playing!!, onBack = { playing = null }, vm = vm)
             group != null -> {
                 BackHandler { group = null }
-                TvChannelGrid(
-                    title = group!!,
-                    channels = channels.filter { it.groupName == group },
-                    onPlay = { playing = it }
-                )
+                val source=when(section){"movie"->movies;"series"->series;else->channels}
+                TvChannelGrid(title=group!!,channels=source.filter{it.groupName==group},onPlay={playing=it})
             }
-            else -> TvHome(channels = channels, onGroup = { group = it })
+            else -> TvHome(channels,movies,series,onSection={type,name->section=type;group=name})
         }
     }
 }
 
 @Composable
-private fun TvHome(channels: List<TvChannel>, onGroup: (String) -> Unit) {
-    val groups = channels.map { it.groupName }.distinct()
-    Column(
-        Modifier.fillMaxSize().padding(56.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        Text("SuperIPTV", style = MaterialTheme.typography.displayMedium)
-        Text("Ao vivo", style = MaterialTheme.typography.headlineMedium)
-        if (groups.isEmpty()) {
-            Text(
-                "Nenhum catálogo liberado para esta TV.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            items(groups) { group ->
-                FocusCard(
-                    title = group,
-                    subtitle = channels.count { it.groupName == group }.toString() + " canais",
-                    onClick = { onGroup(group) }
-                )
-            }
+private fun TvHome(live:List<TvChannel>,movies:List<TvChannel>,series:List<TvChannel>,onSection:(String,String)->Unit) {
+    Column(Modifier.fillMaxSize().padding(56.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
+        Text("SuperIPTV",style=MaterialTheme.typography.displayMedium)
+        listOf("live" to ("TV ao vivo" to live),"movie" to ("Filmes" to movies),"series" to ("Séries" to series)).forEach{entry->
+            val type=entry.first;val title=entry.second.first;val items=entry.second.second
+            Text(title,style=MaterialTheme.typography.headlineMedium)
+            if(items.isEmpty())Text("Nenhum conteúdo disponível.",color=MaterialTheme.colorScheme.onSurfaceVariant)
+            LazyRow(horizontalArrangement=Arrangement.spacedBy(18.dp)){items(items.map{it.groupName}.distinct()){group->FocusCard(group,items.count{it.groupName==group}.toString()+" itens"){onSection(type,group)}}}
         }
     }
 }
