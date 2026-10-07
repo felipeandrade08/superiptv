@@ -1,0 +1,6 @@
+package com.superiptv.tv.data
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+class TvApi(private val base:String){private val client=OkHttpClient();fun login(email:String,password:String,key:String)=request("/v1/auth/login","POST",JSONObject().put("email",email).put("password",password).put("deviceKey",key).put("deviceName","Android TV").put("platform","android-tv"),null);fun catalog(token:String)=request("/v1/catalog","GET",null,token);private fun request(path:String,method:String,json:JSONObject?,token:String?):JSONObject{val b=Request.Builder().url(base.trimEnd('/')+path);if(token!=null)b.header("Authorization","Bearer $token");if(method=="POST")b.post(json.toString().toRequestBody("application/json".toMediaType())) else b.get();client.newCall(b.build()).execute().use{r->val s=r.body?.string().orEmpty();if(!r.isSuccessful)error(JSONObject(s.ifBlank{"{}"}).optString("error","request_failed"));return JSONObject(s)}}}
