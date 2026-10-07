@@ -29,3 +29,27 @@ Um relay/proxy de mídia só deve ser adicionado se a licença/autorização da 
 ## Segredos
 
 Nunca versione `DATABASE_URL`, `JWT_SECRET`, `MASTER_BOOTSTRAP_TOKEN` ou credenciais da fonte. O token de bootstrap existe apenas para criar o primeiro Master e deve ser rotacionado/desabilitado operacionalmente depois do bootstrap.
+
+## Criptografia do catálogo
+
+Configure `CATALOG_SECRET_KEY` antes de sincronizar catálogo em produção e mantenha essa chave em um cofre/secret manager. A API usa AES-256-GCM e não devolve a fonte privada nas rotas administrativas.
+
+Para uma instalação que já possua catálogo em plaintext:
+
+1. faça backup do PostgreSQL;
+2. implante o código e execute `npm --workspace backend/api run db:migrate`;
+3. com a mesma `CATALOG_SECRET_KEY` definitiva configurada, execute `npm --workspace backend/api run db:encrypt-catalog`;
+4. valide login, catálogo e playback;
+5. não troque a chave sem um processo explícito de rotação/recriptografia.
+
+As colunas legadas permanecem temporariamente para compatibilidade de migração, mas dados novos são gravados apenas nos campos criptografados.
+
+## Limites de sincronização
+
+`CATALOG_SYNC_MAX_BYTES` limita o total recebido da fonte e `CATALOG_SYNC_MAX_ITEMS` limita a quantidade de itens processados. O sync tem timeout de conexão/resposta e aborta a transação se ultrapassar os limites; o catálogo ativo anterior permanece válido porque a alteração ocorre dentro de transação.
+
+## Endpoints dos aplicativos
+
+Android Mobile e Android TV recebem a API pelo Gradle property `SUPERIPTV_API_URL`. Em produção, forneça uma URL HTTPS durante o build. O Desktop lê `SUPERIPTV_API_URL` do ambiente. O painel web usa `VITE_API_URL`.
+
+Os fallbacks HTTP/localhost existem somente para desenvolvimento local e não devem ser usados nos artefatos distribuídos.
