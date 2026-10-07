@@ -8,7 +8,8 @@ import { Readable } from "node:stream";
 import { createInterface } from "node:readline";
 import { pool } from "./db.js";
 
-type JwtUser={sub:string;role:"master"|"customer";deviceId?:string};
+type JwtUser={sub:string;role:"master"|"customer";deviceId?:string;sessionVersion?:number};
+type PgError={code?:string;constraint?:string};
 const hash=(v:string)=>createHash("sha256").update(v).digest("hex");
 export function buildApp(){
  const secret=process.env.JWT_SECRET;
@@ -22,9 +23,10 @@ export function buildApp(){
  app.register(jwt,{secret:secret??"development-only-change-me"});
  app.register(cors,{origin:origins.length?origins:false,credentials:false});
  app.register(rateLimit,{global:false,max:100,timeWindow:"1 minute"});
- const auth=async(req:any,reply:any)=>{try{await req.jwtVerify()}catch{return reply.code(401).send({error:"unauthorized"})}const u=req.user as JwtUser;const r=await pool.query("select u.status,u.expires_at,d.active device_active from app_users u left join devices d on d.id=$2 and d.user_id=u.id where u.id=$1",[u.sub,u.deviceId??null]);const x=r.rows[0];if(!x||x.status!=="active"||(x.expires_at&&new Date(x.expires_at)<=new Date())||(u.deviceId&&x.device_active!==true))return reply.code(401).send({error:"session_inactive"})};
+ const auth=async(req:any,reply:any)=>{try{await req.jwtVerify()}catch{return reply.code(401).send({error:"unauthorized"})}const u=req.user as JwtUser;const r=await pool.query("select u.status,u.expires_at,u.session_version,d.active device_active from app_users u left join devices d on d.id=$2 and d.user_id=u.id where u.id=$1",[u.sub,u.deviceId??null]);const x=r.rows[0];if(!x||x.status!=="active"||(x.expires_at&&new Date(x.expires_at)<=new Date())||(u.deviceId&&x.device_active!==true)||(u.sessionVersion??0)!==x.session_version)return reply.code(401).send({error:"session_inactive"})};
  const master=async(req:any,reply:any)=>{await auth(req,reply);if(reply.sent)return;const u=req.user as JwtUser;if(u.role!=="master")return reply.code(403).send({error:"master_required"})};
- const audit=async(req:any,action:string,targetType:string,targetId?:string,metadata:any={})=>{const u=req.user as JwtUser;await pool.query("insert into admin_audit_log(actor_user_id,action,target_type,target_id,metadata) values($1,$2,$3,$4,$5::jsonb)",[u.sub,action,targetType,targetId??null,JSON.stringify(metadata)])};
+ const audit=async(req:any,action:string,targetType:string,targetId?:string,metadata:any={})=>{const u=req.user as JwtUser;try{await pool.query("insert into admin_audit_log(actor_user_id,action,target_type,target_id,metadata) values($1,$2,$3,$4,$5::jsonb)",[u.sub,action,targetType,targetId??null,JSON.stringify(metadata)])}catch(error){req.log.error({error,action,targetType,targetId},"audit_write_failed")}};
+ const dbConflict=(error:unknown)=>{const e=error as PgError;return e?.code==="23505"};
  app.get("/health",async()=>({status:"ok",service:"superiptv-api",version:"0.4.0"}));
  app.post("/v1/bootstrap/master",{config:{rateLimit:{max:5,timeWindow:"15 minutes"}}},async(req:any,reply)=>{
   const expected=process.env.MASTER_BOOTSTRAP_TOKEN;if(!expected||req.headers["x-bootstrap-token"]!==expected)return reply.code(404).send({error:"not_found"});
