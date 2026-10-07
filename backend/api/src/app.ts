@@ -7,11 +7,19 @@ import { pool } from "./db.js";
 type JwtUser={sub:string;role:"master"|"customer";deviceId?:string};
 const hash=(v:string)=>createHash("sha256").update(v).digest("hex");
 export function buildApp(){
+ const secret=process.env.JWT_SECRET;
+ if(process.env.NODE_ENV==="production"&&(!secret||secret.length<32)) throw new Error("JWT_SECRET must contain at least 32 characters in production");
  const app=Fastify({logger:true,bodyLimit:2*1024*1024});
- app.register(jwt,{secret:process.env.JWT_SECRET??"development-only-change-me"});
+ app.register(jwt,{secret:secret??"development-only-change-me"});
  const auth=async(req:any,reply:any)=>{try{await req.jwtVerify()}catch{return reply.code(401).send({error:"unauthorized"})}};
  const master=async(req:any,reply:any)=>{await auth(req,reply);if(reply.sent)return;const u=req.user as JwtUser;if(u.role!=="master")return reply.code(403).send({error:"master_required"})};
- app.get("/health",async()=>({status:"ok",service:"superiptv-api",version:"0.3.0"}));
+ app.get("/health",async()=>({status:"ok",service:"superiptv-api",version:"0.4.0"}));
+ app.post("/v1/bootstrap/master",async(req:any,reply)=>{
+  const expected=process.env.MASTER_BOOTSTRAP_TOKEN;if(!expected||req.headers["x-bootstrap-token"]!==expected)return reply.code(404).send({error:"not_found"});
+  const exists=await pool.query("select 1 from app_users where role='master' limit 1");if(exists.rowCount)return reply.code(409).send({error:"master_already_exists"});
+  const {name,email,password}=req.body??{};if(!name||!email||!password||String(password).length<10)return reply.code(400).send({error:"invalid_master"});
+  const passwordHash=await bcrypt.hash(password,12);const r=await pool.query("insert into app_users(role,name,email,password_hash,device_limit) values('master',$1,$2,$3,5) returning id,name,email,role",[name,email,passwordHash]);return reply.code(201).send(r.rows[0]);
+ });
  app.post("/v1/auth/login",async(req:any,reply)=>{const {email,password,deviceKey,deviceName,platform}=req.body??{};if(!email||!password||!deviceKey)return reply.code(400).send({error:"missing_credentials"});
   const r=await pool.query("select * from app_users where lower(email)=lower($1) limit 1",[email]);const user=r.rows[0];if(!user||!(await bcrypt.compare(password,user.password_hash)))return reply.code(401).send({error:"invalid_credentials"});if(user.status!=="active"||(user.expires_at&&new Date(user.expires_at)<=new Date()))return reply.code(403).send({error:"access_inactive"});
   const count=await pool.query("select count(*)::int n from devices where user_id=$1 and active=true",[user.id]);let d=await pool.query("select * from devices where user_id=$1 and device_key=$2",[user.id,deviceKey]);
@@ -23,9 +31,14 @@ export function buildApp(){
   await pool.query("insert into refresh_sessions(user_id,device_id,token_hash,expires_at) values($1,$2,$3,now()+interval '30 days')",[user.id,device.id,hash(refresh)]);
   return {accessToken:access,refreshToken:refresh,user:{id:user.id,name:user.name,role:user.role},device:{id:device.id,name:device.name}};
  });
+ app.post("/v1/auth/refresh",async(req:any,reply)=>{const token=String(req.body?.refreshToken??"");if(!token)return reply.code(400).send({error:"refresh_required"});const r=await pool.query("select s.*,u.role,u.status,u.expires_at,d.active device_active from refresh_sessions s join app_users u on u.id=s.user_id left join devices d on d.id=s.device_id where s.token_hash=$1 and s.revoked_at is null and s.expires_at>now()",[hash(token)]);const s=r.rows[0];if(!s||s.status!=="active"||s.device_active===false||(s.expires_at&&new Date(s.expires_at)<=new Date()))return reply.code(401).send({error:"refresh_invalid"});const access=app.jwt.sign({sub:s.user_id,role:s.role,deviceId:s.device_id},{expiresIn:"15m"});return {accessToken:access}});
+ app.post("/v1/auth/logout",async(req:any)=>{const token=String(req.body?.refreshToken??"");if(token)await pool.query("update refresh_sessions set revoked_at=now() where token_hash=$1 and revoked_at is null",[hash(token)]);return {ok:true}});
  app.get("/v1/catalog",{preHandler:auth},async(req:any,reply)=>{const u=req.user as JwtUser;if(u.role!=="customer")return reply.code(403).send({error:"customer_required"});const check=await pool.query("select status,expires_at from app_users where id=$1",[u.sub]);const x=check.rows[0];if(!x||x.status!=="active"||(x.expires_at&&new Date(x.expires_at)<=new Date()))return reply.code(403).send({error:"access_inactive"});const r=await pool.query("select id,name,group_name as \"group\",logo_url as logo,'/v1/play/'||id as \"playbackPath\" from catalog_items where active=true order by group_name,name");return {items:r.rows}});
  app.get("/v1/admin/overview",{preHandler:master},async()=>{const [u,d,c]=await Promise.all([pool.query("select count(*)::int n from app_users where role='customer'"),pool.query("select count(*)::int n from devices where active=true"),pool.query("select count(*)::int n from catalog_items where active=true")]);return {customers:u.rows[0].n,devices:d.rows[0].n,catalogItems:c.rows[0].n}});
  app.post("/v1/admin/customers",{preHandler:master},async(req:any,reply)=>{const {name,email,password,expiresAt,deviceLimit}=req.body??{};if(!name||!email||!password)return reply.code(400).send({error:"required_fields"});const passwordHash=await bcrypt.hash(password,12);const r=await pool.query("insert into app_users(role,name,email,password_hash,expires_at,device_limit) values('customer',$1,$2,$3,$4,$5) returning id,name,email,status,expires_at,device_limit",[name,email,passwordHash,expiresAt??null,deviceLimit??2]);return reply.code(201).send(r.rows[0])});
+ app.get("/v1/admin/customers",{preHandler:master},async()=>{const r=await pool.query("select id,name,email,status,expires_at,device_limit,created_at from app_users where role='customer' order by created_at desc");return r.rows});
+ app.get("/v1/admin/devices",{preHandler:master},async()=>{const r=await pool.query("select d.id,d.name,d.platform,d.active,d.last_seen_at,u.name customer_name,u.email from devices d join app_users u on u.id=d.user_id where u.role='customer' order by d.last_seen_at desc");return r.rows});
+ app.patch("/v1/admin/customers/:id/status",{preHandler:master},async(req:any,reply)=>{const status=String(req.body?.status??"");if(!["active","blocked","expired"].includes(status))return reply.code(400).send({error:"invalid_status"});const r=await pool.query("update app_users set status=$1 where id=$2 and role='customer' returning id,name,email,status,expires_at,device_limit",[status,req.params.id]);if(!r.rowCount)return reply.code(404).send({error:"not_found"});if(status!=="active")await pool.query("update refresh_sessions set revoked_at=now() where user_id=$1 and revoked_at is null",[req.params.id]);return r.rows[0]});
  app.patch("/v1/admin/devices/:id/revoke",{preHandler:master},async(req:any,reply)=>{const r=await pool.query("update devices set active=false where id=$1 returning id",[req.params.id]);if(!r.rowCount)return reply.code(404).send({error:"not_found"});await pool.query("update refresh_sessions set revoked_at=now() where device_id=$1 and revoked_at is null",[req.params.id]);return {ok:true}});
  return app;
 }
