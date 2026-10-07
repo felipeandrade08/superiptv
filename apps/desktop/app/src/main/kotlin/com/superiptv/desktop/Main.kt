@@ -27,6 +27,36 @@ fun main()=application{Window(onCloseRequest=::exitApplication,title="SuperIPTV"
     when{selected!=null->DesktopPlayer(selected!!,session,api){selected=null};section=="Ao vivo"->ChannelList(channels.filter{it.type=="live"},"Nenhum canal ao vivo liberado para esta conta."){selected=it};section=="Filmes"->CatalogList(channels.filter{it.type=="movie"},"Nenhum filme liberado para esta conta.",favorites,{item->session.toggleFavorite(item.id);favorites=session.favoriteIds()}){selected=it};section=="Séries"->CatalogList(channels.filter{it.type=="series"},"Nenhuma série liberada para esta conta.",favorites,{item->session.toggleFavorite(item.id);favorites=session.favoriteIds()}){selected=it};section=="Minha lista"->CatalogList(channels.filter{it.id in favorites},"Sua lista de favoritos está vazia.",favorites,{item->session.toggleFavorite(item.id);favorites=session.favoriteIds()}){selected=it};else->Text(if(channels.isEmpty())"Catálogo ainda não sincronizado." else "${channels.size} itens liberados pelo administrador.")}}}
  }}
 @Composable private fun Login(loading:Boolean,error:String?,onLogin:(String,String)->Unit){var email by remember{mutableStateOf("")};var password by remember{mutableStateOf("")};Box(Modifier.fillMaxSize().padding(64.dp)){Card(Modifier.width(460.dp)){Column(Modifier.padding(32.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){Text("SuperIPTV",style=MaterialTheme.typography.displaySmall);Text("Entre com a conta liberada pelo administrador.");OutlinedTextField(email,{email=it},label={Text("E-mail")},modifier=Modifier.fillMaxWidth());OutlinedTextField(password,{password=it},label={Text("Senha")},modifier=Modifier.fillMaxWidth());Button(onClick={onLogin(email,password)},enabled=!loading,modifier=Modifier.fillMaxWidth()){Text(if(loading)"Entrando..." else "Entrar")};error?.let{Text(it,color=MaterialTheme.colorScheme.error)}}}}}
-@Composable private fun ChannelList(channels:List<DesktopChannel>,emptyMessage:String,onPlay:(DesktopChannel)->Unit){if(channels.isEmpty()){Text(emptyMessage);return};LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(channels,key={it.id}){c->Card(Modifier.fillMaxWidth().clickable{onPlay(c)}){Row(Modifier.padding(16.dp)){Column{Text(c.name,style=MaterialTheme.typography.titleMedium);Text(c.group)}}}}}}
-@Composable private fun CatalogList(items:List<DesktopChannel>,emptyMessage:String,favorites:Set<String>,onFavorite:(DesktopChannel)->Unit,onPlay:(DesktopChannel)->Unit){if(items.isEmpty()){Text(emptyMessage);return};val grouped=items.groupBy{if(it.type=="series")it.seriesName?.takeIf{s->s.isNotBlank()}?:it.group else it.group};LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp)){grouped.forEach{(group,content)->item(key="group:"+group){Text(group,style=MaterialTheme.typography.titleLarge)};items(content.sortedWith(compareBy<DesktopChannel>{it.seasonNumber?:Int.MAX_VALUE}.thenBy{it.episodeNumber?:Int.MAX_VALUE}.thenBy{it.name}),key={it.id}){item->Card(Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.SpaceBetween){Column(Modifier.weight(1f).clickable{onPlay(item)}){Text(item.name,style=MaterialTheme.typography.titleMedium);Text(listOfNotNull(item.group,item.year?.toString(),item.seasonNumber?.let{"T$it"},item.episodeNumber?.let{"E$it"}).joinToString(" · "))};TextButton(onClick={onFavorite(item)}){Text(if(item.id in favorites)"♥" else "♡")}}}}}}
+@Composable
+private fun ChannelList(channels:List<DesktopChannel>,emptyMessage:String,onPlay:(DesktopChannel)->Unit){
+ if(channels.isEmpty()){Text(emptyMessage);return}
+ LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){
+  items(channels,key={it.id}){channel->
+   Card(Modifier.fillMaxWidth().clickable{onPlay(channel)}){
+    Row(Modifier.padding(16.dp)){Column{Text(channel.name,style=MaterialTheme.typography.titleMedium);Text(channel.group)}}
+   }
+  }
+ }
+}
+@Composable
+private fun CatalogList(items:List<DesktopChannel>,emptyMessage:String,favorites:Set<String>,onFavorite:(DesktopChannel)->Unit,onPlay:(DesktopChannel)->Unit){
+ if(items.isEmpty()){Text(emptyMessage);return}
+ val grouped=items.groupBy{if(it.type=="series")it.seriesName?.takeIf{s->s.isNotBlank()}?:it.group else it.group}
+ LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp)){
+  grouped.forEach{(group,content)->
+   item(key="group:"+group){Text(group,style=MaterialTheme.typography.titleLarge)}
+   items(content.sortedWith(compareBy<DesktopChannel>{it.seasonNumber?:Int.MAX_VALUE}.thenBy{it.episodeNumber?:Int.MAX_VALUE}.thenBy{it.name}),key={it.id}){item->
+    Card(Modifier.fillMaxWidth()){
+     Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.SpaceBetween){
+      Column(Modifier.weight(1f).clickable{onPlay(item)}){
+       Text(item.name,style=MaterialTheme.typography.titleMedium)
+       Text(listOfNotNull(item.group,item.year?.toString(),item.seasonNumber?.let{"T$it"},item.episodeNumber?.let{"E$it"}).joinToString(" · "))
+      }
+      TextButton(onClick={onFavorite(item)}){Text(if(item.id in favorites)"♥" else "♡")}
+     }
+    }
+   }
+  }
+ }
+}
 @Composable private fun DesktopPlayer(channel:DesktopChannel,session:DesktopSession,api:DesktopApi,onBack:()->Unit){val panel=remember{DesktopPlayerPanel()};var playerError by remember{mutableStateOf<String?>(null)};LaunchedEffect(channel.id){if(!panel.isAvailable()){playerError="Runtime VLC não encontrado. Reinstale o SuperIPTV Desktop com o pacote completo.";return@LaunchedEffect};val token=session.access?:return@LaunchedEffect;runCatching{withContext(Dispatchers.IO){api.playbackTicket(channel.id,token)}}.onSuccess{panel.play(it);if(channel.type!="live"){delay(800);panel.seek(session.progress(channel.id))}}.onFailure{playerError=it.message?:"Não foi possível autorizar a reprodução."}};DisposableEffect(panel){onDispose{session.saveProgress(channel.id,panel.position(),channel.type);panel.stop();panel.release()}};Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Column{Text(channel.name,style=MaterialTheme.typography.headlineMedium);Text(channel.group)};TextButton(onClick=onBack){Text("Voltar")}};if(playerError!=null)Card(Modifier.fillMaxWidth()){Text(playerError!!,modifier=Modifier.padding(20.dp),color=MaterialTheme.colorScheme.error)}else SwingPanel(factory={panel},modifier=Modifier.fillMaxSize())}}
