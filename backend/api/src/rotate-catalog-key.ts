@@ -9,12 +9,12 @@ if(oldKey===process.env.CATALOG_SECRET_KEY)throw new Error("old and new catalog 
 async function run(){
  const sources=await pool.query("select id,source_url_encrypted value from catalog_sources where source_url_encrypted is not null");
  for(const row of sources.rows)await pool.query("update catalog_sources set source_url_encrypted=$1 where id=$2",[encryptSecret(decryptSecretWithKey(row.value,oldKey)),row.id]);
- let rotated=0;
+ let rotated=0;let lastId="";
  while(true){
-  const rows=await pool.query("select id,stream_url_encrypted value from catalog_items where stream_url_encrypted is not null and coalesce(updated_at,now())<=now() order by id limit 500 offset $1",[rotated]);
+  const rows=await pool.query("select id,stream_url_encrypted value from catalog_items where stream_url_encrypted is not null and id>$1 order by id limit 500",[lastId]);
   if(!rows.rowCount)break;
   const client=await pool.connect();
-  try{await client.query("begin");for(const row of rows.rows)await client.query("update catalog_items set stream_url_encrypted=$1 where id=$2",[encryptSecret(decryptSecretWithKey(row.value,oldKey)),row.id]);await client.query("commit");rotated+=rows.rowCount}catch(error){await client.query("rollback");throw error}finally{client.release()}
+  try{await client.query("begin");for(const row of rows.rows)await client.query("update catalog_items set stream_url_encrypted=$1 where id=$2",[encryptSecret(decryptSecretWithKey(row.value,oldKey)),row.id]);await client.query("commit");rotated+=rows.rowCount;lastId=rows.rows[rows.rows.length-1].id}catch(error){await client.query("rollback");throw error}finally{client.release()}
  }
  console.log(`catalog key rotated: sources=${sources.rowCount??0}, items=${rotated}`);
 }
