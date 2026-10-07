@@ -81,7 +81,15 @@ export function buildApp(){
    return reply.code(400).send({error:"catalog_sync_failed"});
   }finally{client.release()}
  });
- app.get("/v1/admin/catalog",{preHandler:master},async()=>{const [source,groups,types]=await Promise.all([pool.query("select id,name,active,updated_at from catalog_sources order by updated_at desc limit 1"),pool.query("select i.group_name as name,count(*)::int items,coalesce(g.content_type,'live') as type from catalog_items i left join catalog_group_types g on g.group_name=i.group_name where i.active=true group by i.group_name,g.content_type order by i.group_name"),pool.query("select content_type as type,count(*)::int items from catalog_items where active=true group by content_type order by content_type")]);return {source:source.rows[0]??null,groups:groups.rows,types:types.rows}});
+ app.get("/v1/admin/catalog",{preHandler:master},async()=>{
+  const [source,groups,types,sync]=await Promise.all([
+   pool.query("select id,name,active,updated_at from catalog_sources order by updated_at desc limit 1"),
+   pool.query("select i.group_name as name,count(*)::int items,coalesce(g.content_type,'live') as type from catalog_items i left join catalog_group_types g on g.group_name=i.group_name where i.active=true group by i.group_name,g.content_type order by i.group_name"),
+   pool.query("select content_type as type,count(*)::int items from catalog_items where active=true group by content_type order by content_type"),
+   pool.query("select id,source_name,status,error_code,items,bytes,duration_ms,started_at,finished_at from catalog_sync_runs order by started_at desc limit 1")
+  ]);
+  return {source:source.rows[0]??null,groups:groups.rows,types:types.rows,sync:sync.rows[0]??null};
+ });
  app.put("/v1/admin/catalog/groups/:group/type",{preHandler:master},async(req:any,reply)=>{const group=decodeURIComponent(String(req.params.group??""));const type=String(req.body?.type??"");if(!group||!["live","movie","series"].includes(type))return reply.code(400).send({error:"invalid_catalog_type"});const exists=await pool.query("select count(*)::int n from catalog_items where active=true and group_name=$1",[group]);if(!exists.rows[0]?.n)return reply.code(404).send({error:"group_not_found"});const client=await pool.connect();try{await client.query("begin");await client.query("insert into catalog_group_types(group_name,content_type,updated_at) values($1,$2,now()) on conflict(group_name) do update set content_type=excluded.content_type,updated_at=now()",[group,type]);const changed=await client.query("update catalog_items set content_type=$2,updated_at=now() where group_name=$1",[group,type]);await client.query("commit");await audit(req,"catalog_group_type_changed","catalog_group",group,{type,items:changed.rowCount??0});return {ok:true,group,type,items:changed.rowCount??0}}catch(e){await client.query("rollback");throw e}finally{client.release()}});
 
  app.get("/v1/admin/overview",{preHandler:master},async()=>{const [u,d,c]=await Promise.all([pool.query("select count(*)::int n from app_users where role='customer'"),pool.query("select count(*)::int n from devices where active=true"),pool.query("select count(*)::int n from catalog_items where active=true")]);return {customers:u.rows[0].n,devices:d.rows[0].n,catalogItems:c.rows[0].n}});
