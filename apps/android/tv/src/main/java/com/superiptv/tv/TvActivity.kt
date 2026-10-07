@@ -43,7 +43,7 @@ fun TvApp(vm: TvViewModel = viewModel()) {
         var playing by remember { mutableStateOf<TvChannel?>(null) }
 
         when {
-            playing != null -> TvPlayerScreen(playing!!) { playing = null }
+            playing != null -> TvPlayerScreen(channel = playing!!, onBack = { playing = null }, vm = vm)
             group != null -> {
                 BackHandler { group = null }
                 TvChannelGrid(
